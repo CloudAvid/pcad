@@ -48,6 +48,9 @@ pvmctl="$basedir/Scripts/pvmctl"
 # Directory of Virtualization Base Images for VM Creation
 bidir="$basedir/VMStorage/BIs"
 
+# Directory of VirtualMachines Cluster Service files
+srvdir="$basedir/Scripts/Services"
+
 check_run()
 {
 	echo "Verify $1 State, Please Wait ... "
@@ -154,7 +157,7 @@ clus_service_add()
 	
 	$sed -e "/<\/resources>/i\ $_resource" "$_tmp_conf" \
 		-e "/<\/rm>/i\ $_service" \
-		-e "s/config_version=\"$clusconf_ver\"/config_version=\"$new_clusconf_ver\"/" > "$_tmp_conf-2"
+		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" > "$_tmp_conf-2"
 	
 	echo "Update Cluster Configuration File ..."
 	$ccs_tool "update" "$_tmp_conf-2"
@@ -178,7 +181,8 @@ clus_service_del()
 	echo "Generate New Cluster Configuration File ..."
 	$sed -e "/<service.*name=\"$1\"/,/<\/service>/d" \
 		-e "/<script.*name=\"$1\"/d" \
-		-e "s/config_version=\"$clusconf_ver\"/config_version=\"$new_clusconf_ver\"/" "$_tmp_conf" > "$_tmp_conf-2"
+		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" \
+		"$_tmp_conf" > "$_tmp_conf-2"
 
 	echo "Update Cluster Configuration File ..."
 	$ccs_tool "update" "$_tmp_conf-2"
@@ -200,8 +204,10 @@ clus_service_ren()
 	$cp "$clusconf" "$_tmp_conf"
 
 	echo "Generate New Cluster Configuration File ..."
-	sed -e "s/$1/$2/g" \
-		-e "s/config_version=\"$clusconf_ver\"/config_version=\"$new_clusconf_ver\"/" "$_tmp_conf" > "$_tmp_conf-2"
+	sed -e "s/\"$1\"/\"$2\"/g" \
+		-e "s:/$1\":/$2\":g" \
+		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" \
+		"$_tmp_conf" > "$_tmp_conf-2"
 
 	echo "Update Cluster Configuration File ..."
         $ccs_tool "update" "$_tmp_conf-2"
@@ -220,6 +226,13 @@ do_edit()
 	$pvmctl "edit" $1
 	if [[ ! $? -eq 0 ]]; then
 		return $?
+	fi
+
+	if [[ ! -f "$srvdir/$1" ]]; then
+		echo "Generating service file ..."
+		$sed -e "s/MY_NAME/$1/g" \
+				"$srvdir/vm-service-ORIG" > "$srvdir/$1" 
+		chmod +x "$srvdir/$1"
 	fi
 
 	$cat $clusconf | $grep "\"$1\"" >/dev/null 2>&1
@@ -251,6 +264,8 @@ do_rmvm()
 		return 1
 	fi
 
+	$rm -v "$srvdir/$1"
+
 	$cat $clusconf | $grep $1 >/dev/null 2>&1
 	if [[ $? -eq 1 ]]; then
 		return 0
@@ -275,10 +290,15 @@ do_rename()
 		return 1
 	fi
 
-	pvmctl "rename" "$1" "$2"
+	$pvmctl "rename" "$1" "$2"
 	if [[ ! $? -eq 0 ]]; then
 		return 1
 	fi
+
+	echo "Generating service file ..."
+	$sed -e "s/MY_NAME/$2/g" "$srvdir/vm-service-ORIG" > "$srvdir/$2" 
+	$rm -v "$srvdir/$1"
+	chmod +x "$srvdir/$2"
 
 	clus_service_ren "$1" "$2"
 	return $?
@@ -304,7 +324,12 @@ do_usage()
 
 do_clone()
 {
-	check_run $1
+	if [[ -z $1 || -z $2 || -z $3 ]]; then
+		echo "usage: clone host clone-name clone-id";
+		return 1;
+	fi	
+
+	check_run "$1"
 	if [[ $? -eq 1 ]]; then
 		echo "Error: $1 is running ..."
 		echo "       Shutdown him before any work ..."

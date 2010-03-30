@@ -1,0 +1,430 @@
+#!/bin/bash
+
+# PDNSoft Co. VirtaulMachines Manager in Cluster
+# Version 0.1
+# 
+# This Manager Placed On "pvmctl" program ...
+# just add Cluster Awareness to him ...
+#
+# 1388-12-12: by hamid jafarian
+#	* start
+
+# Progarm Informations 
+scriptname="pcad"
+scriptversion="0.1"
+
+sed="/bin/sed"
+cut="/bin/cut"
+cp="/bin/cp"
+cat="/bin/cat"
+rm="/bin/rm"
+grep="/bin/grep"
+qemuimg="/usr/bin/qemu-img"
+tail="/usr/bin/tail"
+awk="/bin/awk"
+
+# Cluster Status Command
+clustat="/usr/sbin/clustat"
+# Cluster Service Management Command
+clusvcadm="/usr/sbin/clusvcadm"
+# Cluster Configuration file
+clusconf="/etc/cluster/cluster.conf"
+
+ccs_tool="/sbin/ccs_tool"
+
+# Cluster Configuration Version .. 
+# Will be retrived from Cluster Configuration File
+clusconf_ver=""
+# Configuration Versions been used for update
+# == ++ clusconf_ver
+new_clusconf_ver=""
+
+# Base Directory of PDNSoft Co. Environment
+basedir=`$sed -e "/^#/d" /etc/PDNSoftCo.bdir`
+logdir="$basedir/var/log"
+
+pvmctl="$basedir/Scripts/pvmctl"
+
+# Directory of Virtualization Base Images for VM Creation
+bidir="$basedir/VMStorage/BIs"
+
+check_run()
+{
+	echo "Verify $1 State, Please Wait ... "
+
+	$clustat -s "$1" >/dev/null 2>&1
+	if [[ $? -eq 0 ]]; then
+		$clustat -s "$1"
+		return 1
+	fi
+	return 0
+}
+
+do_start()
+{
+	if [[ -z $1 ]]; then
+		echo "usage: start host_name"
+		return 1
+	fi
+
+	check_run "$1"
+	if [[ $? -eq 1 ]]; then
+		echo "Error: $1 is running ..."
+		return 1
+	fi
+
+	if [[ ! -z $2 ]]; then
+		echo "Starting $1 on $2:"
+		$clusvcadm -e "$1" -m "$2"
+	else
+		$clusvcadm -e "$1"
+	fi
+	return $?
+}
+
+do_stop()
+{
+	if [[ -z $1 ]]; then
+		echo "usage: stop host_name"
+		return 1
+	fi
+
+	check_run "$1"
+	if [[ $? -eq 0 ]]; then
+		echo "$1 is stop right now !!"
+		return 1
+	fi
+
+	$clusvcadm -d "$1"
+	return $?
+}
+
+do_restart()
+{
+	if [[ -z $1 ]]; then
+		echo "usage: restart host_name"
+		return 1
+	fi
+
+        check_run "$1"
+	if [[ $? -eq 0 ]]; then
+		echo "$1 is stop right now !!"
+		return 1
+	fi
+
+	$clusvcadm -R "$1"
+	return $?
+	
+}
+
+do_get_clusconf_ver()
+{
+	if [[ ! -f $clusconf ]]; then
+		echo "Error: Cluster Configuration file does't exist ..."
+		return 1
+	fi
+
+	clusconf_ver=$( $sed -n -e "/config_version/p" $clusconf  | \
+			$cut -d " " -f 3 | $cut -d "=" -f 2 )
+	
+	clusconf_ver=${clusconf_ver#\"}
+	clusconf_ver=${clusconf_ver%\"}	 
+
+	new_clusconf_ver=$(( $clusconf_ver + 1 ))
+}
+
+# Add Cluster Service
+# usage: clus_service_add new_service
+clus_service_add()
+{
+	do_get_clusconf_ver
+	if [[ $? -eq 1 ]]; then
+		return 1
+	fi
+	
+	_tmp_conf="/tmp/__pcad_$RANDOM"
+	$cp "$clusconf" "$_tmp_conf"
+
+	echo "Generate New Cluster Configuration File ..."
+	 _resource=" \t\t\t<script file=\"/PDNSoftCo./Scripts/Services/$1\" name=\"$1\"\/>"
+
+	_service=" \t\t<service autostart=\"0\" domain=\"VMS-Area\" exclusive=\"0\" name=\"$1\" recovery=\"relocate\">\n"
+	_service=$_service" \t\t\t<script ref=\"$1\"/>\n"
+	_service=$_service" \t\t</service>"
+	
+	$sed -e "/<\/resources>/i\ $_resource" "$_tmp_conf" \
+		-e "/<\/rm>/i\ $_service" \
+		-e "s/config_version=\"$clusconf_ver\"/config_version=\"$new_clusconf_ver\"/" > "$_tmp_conf-2"
+	
+	echo "Update Cluster Configuration File ..."
+	$ccs_tool "update" "$_tmp_conf-2"
+	_ret=$?
+	$rm -f "$_tmp_conf-2" "$_tmp_conf" > /dev/null 2>&1
+	return $_ret
+}
+
+# Delete Cluster Service
+# usage: clus_service_del service_name
+clus_service_del()
+{
+	do_get_clusconf_ver
+	if [[ $? -eq 1 ]]; then
+		return 1
+	fi
+
+	_tmp_conf="/tmp/__pcad_$RANDOM"
+	$cp "$clusconf" "$_tmp_conf"
+
+	echo "Generate New Cluster Configuration File ..."
+	$sed -e "/<service.*name=\"$1\"/,/<\/service>/d" \
+		-e "/<script.*name=\"$1\"/d" \
+		-e "s/config_version=\"$clusconf_ver\"/config_version=\"$new_clusconf_ver\"/" "$_tmp_conf" > "$_tmp_conf-2"
+
+	echo "Update Cluster Configuration File ..."
+	$ccs_tool "update" "$_tmp_conf-2"
+	_ret=$?
+	$rm -f "$_tmp_conf-2" "$_tmp_conf" > /dev/null 2>&1
+	return $_ret
+}
+
+# Rename Cluster Service
+# usage: clus_service_rename old_name new_name
+clus_service_ren()
+{
+	do_get_clusconf_ver
+	if [[ $? -eq 1 ]]; then
+		return 1
+	fi
+
+	_tmp_conf="/tmp/__pcad_$RANDOM"
+	$cp "$clusconf" "$_tmp_conf"
+
+	echo "Generate New Cluster Configuration File ..."
+	sed -e "s/$1/$2/g" \
+		-e "s/config_version=\"$clusconf_ver\"/config_version=\"$new_clusconf_ver\"/" "$_tmp_conf" > "$_tmp_conf-2"
+
+	echo "Update Cluster Configuration File ..."
+        $ccs_tool "update" "$_tmp_conf-2"
+        _ret=$?
+        $rm -f "$_tmp_conf-2" "$_tmp_conf" > /dev/null 2>&1
+        return $_ret
+}
+
+do_edit()
+{
+	if [[ -z $1 ]]; then
+		echo "usage: edit host_name"
+		return 1
+	fi
+
+	$pvmctl "edit" $1
+	if [[ ! $? -eq 0 ]]; then
+		return $?
+	fi
+
+	$cat $clusconf | $grep "\"$1\"" >/dev/null 2>&1
+	if [[ $? -eq 0 ]]; then
+		return 0
+	fi
+
+	clus_service_add "$1"
+	return $?
+}
+
+do_rmvm()
+{
+	if [[ -z $1 ]]; then
+		echo "usage: rmvm host_name"
+		return 1
+	fi
+
+	check_run $1
+	if [[ $? -eq 1 ]]; then
+		echo "Error: $1 is running ..."
+		echo "       Shutting down him before any work ..."
+
+		return 1
+	fi
+
+	$pvmctl "rmvm" "$1"
+	if [[ ! $? -eq 0 ]]; then
+		return 1
+	fi
+
+	$cat $clusconf | $grep $1 >/dev/null 2>&1
+	if [[ $? -eq 1 ]]; then
+		return 0
+	fi
+
+	clus_service_del "$1"
+	return $?
+}
+
+do_rename()
+{
+	if [[ -z "$1" || -z "$2" ]]; then
+		echo "usage: rename host_name new_name"
+		return 1
+	fi
+	
+	check_run $1
+	if [[ $? -eq 1 ]]; then
+		echo "Error: $1 is running ..."
+		echo "       Shutting down him before any work ..."
+
+		return 1
+	fi
+
+	pvmctl "rename" "$1" "$2"
+	if [[ ! $? -eq 0 ]]; then
+		return 1
+	fi
+
+	clus_service_ren "$1" "$2"
+	return $?
+}
+
+do_usage()
+{
+	${cat} <<-end-of-help
+	${scriptname} ${scriptversion}
+	Licensed under BSDL
+	Copyright 2010
+
+	${scriptname} is a management and control script for KVM-based virtual machines.
+
+	Usage:  ${scriptname} start    host    - start the named VM
+	        ${scriptname} startvnc host    - start the named VM, and then connect to console via VNC
+
+	        ${scriptname} shutdown host    - send shutdown signal to VM
+
+
+	end-of-help
+}
+
+do_clone()
+{
+	check_run $1
+	if [[ $? -eq 1 ]]; then
+		echo "Error: $1 is running ..."
+		echo "       Shutdown him before any work ..."
+
+		return 1
+	fi
+
+	$pvmctl "clone"	"$1" "$2" "$3"
+	if [[ ! $? -eq 0 ]]; then
+                return $?
+        fi
+	
+	do_edit "$2"
+}
+
+do_create()
+{
+	$pvmctl "create" "$1" "$2" "$3"
+	if [[ ! $? -eq 0 ]]; then
+		return $?
+	fi
+
+	$cat $clusconf | $grep $1 >/dev/null 2>&1
+	if [[ $? -eq 0 ]]; then
+		return 0
+	fi
+
+	clus_service_add "$2"
+	return $?
+}
+
+do_show_log()
+{
+	if [[ -f "$basedir/etc/vm-services-log-file" ]]; then
+		log_file="`$sed -e "/^#/d" $basedir/etc/vm-services-log-file`"
+
+		if [[ $(expr ${log_file} : '/') -eq 0 ]]; then
+			log_file="$logdir/$log_file"
+		fi
+	fi
+
+	if [[ -f "$log_file" ]]; then
+		$tail -f "$log_file"
+	fi
+}
+
+do_info()
+{
+	vms_ids=`$pvmctl "ls" "with-ids" | $sed -e "/host/,/----/d"`
+	vms_states=`$clustat | $sed -e "/Cluster Status/,/------ ----/d" | \
+			$sed -e "1,/------ ----/d" -e "s/service://" -e "s/\.yazd//" | \
+			$awk '{ printf "%-20s %-20s %-20s\n" ,$1,$2,$3 }'`
+	echo $vms_states | sed -n -e "/new-lin/,+3p"
+	echo -e $vms_ids | grep new-lin
+}
+
+# Main script
+case "${1}" in
+	"start")
+		do_start "$2" "$3"
+		exit $?
+		;;
+	"stop")
+		do_stop "$2"
+		exit $?
+		;;
+	"restart")
+		do_restart "$2"
+		exit $?
+		;;
+	"status")
+		if [[ ! -z $2 ]]; then
+			$clustat "status" -s "$2"
+		else
+			$clustat "status"
+		fi
+		;;
+	"mkimg")
+		$pvmctl "mkimg" $2 $3 $4
+		;;
+	"ls")
+		$pvmctl "ls" "$2"
+		#do_info
+		;;
+	"lst")
+		$pvmctl "lst"
+		;;
+	"rmvm")
+		do_rmvm "$2"
+		exit $?
+		;;
+	"rename")
+		do_rename "$2" "$3"
+		exit $?
+		;;
+	"info")
+		check_run "$2"
+		echo ""
+		echo "Config Parameters:"
+		$pvmctl "info" "$2"
+		;;
+	"edit")
+		do_edit "$2"
+		exit $?
+		;;
+	"create")
+		do_create "$2" "$3" "$4"
+		exit $?
+		;;
+	"clone")
+		do_clone "$2" "$3" "$4"
+		exit $?
+		;;
+	"show-log")
+		do_show_log
+		;;
+	"help")
+		;;
+	*)
+		;;
+esac
+
+exit 0

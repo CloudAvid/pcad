@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Script TO Manage VMs As Service ...
+# It's the Skeleton Script 
+# USAGE: pvm-vm-service host {start,restart,stop,status}
+#
+# History:
+# 1388-12-18 by hamid jafarian
+#	* in start, added status check(run or not) of machine
+
+sed="/bin/sed"
+
+# Base Directory of PDNSoft Co. Environment
+basedir=`$sed -e "/^#/d" /etc/PDNSoftCo.bdir`
+pvmctl="$basedir/Scripts/pvmctl"
+
+# Main script
+case "$2" in
+	start)
+		run=`${pvmctl} status ${1}| $sed -n -e "/not running/p"`
+		if [[ -z $run ]]; then
+			exit 0
+		fi
+
+		${pvmctl} "${2}" "${1}"
+		;;
+	stop)
+		# Waiting For Host To ShutDown
+		for (( i = 0 ; i < 6 ; ++i )); do
+			${pvmctl} shutdown "${1}"
+			run=`${pvmctl} status ${1}| $sed -n -e "/not running/p"`
+			if [[ ! -z $run ]]; then
+				break;
+			fi
+			sleep 10
+		done
+		if [[ -z $run ]]; then
+			${pvmctl} stop "${1}"
+		fi
+		;;
+	restart)
+		${pvmctl} reset "${1}"
+		;;
+	status)
+		${pvmctl} "${2}" "${1}"
+		;;
+	*)
+		echo "Usage: ${0} host [start|stop|restart|status]"
+		;;
+esac

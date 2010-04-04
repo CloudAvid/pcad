@@ -26,17 +26,15 @@ case "$2" in
 		;;
 	stop)
 		# Waiting For Host To ShutDown
-		for (( i = 0 ; i < 6 ; ++i )); do
+		for (( i = 0 ; i < 12 ; ++i )); do
 			${pvmctl} shutdown "${1}"
-			run=`${pvmctl} status ${1}| $sed -n -e "/not running/p"`
-			if [[ ! -z $run ]]; then
+			${pvmctl} status ${1} > /dev/null
+			if [[ $? -eq 0 ]]; then
 				break;
 			fi
-			sleep 10
+			sleep 5
 		done
-		if [[ -z $run ]]; then
-			${pvmctl} stop "${1}"
-		fi
+		${pvmctl} stop "${1}"
 		;;
 	restart)
 		${pvmctl} reset "${1}"

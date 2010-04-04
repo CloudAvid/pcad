@@ -163,6 +163,15 @@ clus_service_add()
 	$ccs_tool "update" "$_tmp_conf-2"
 	_ret=$?
 	$rm -f "$_tmp_conf-2" "$_tmp_conf" > /dev/null 2>&1
+
+	if [[ $_ret -eq '0' ]]; then
+		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
+		while ! { $clustat | $grep "service:$1 " > /dev/null; }; do
+			sleep 2
+			echo -n "."
+		done
+		echo ""
+	fi
 	return $_ret
 }
 
@@ -188,6 +197,15 @@ clus_service_del()
 	$ccs_tool "update" "$_tmp_conf-2"
 	_ret=$?
 	$rm -f "$_tmp_conf-2" "$_tmp_conf" > /dev/null 2>&1
+
+	if [[ $_ret -eq '0' ]]; then
+		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
+		while { $clustat | $grep "service:$1 " > /dev/null; }; do
+			sleep 2
+			echo -n "."
+		done
+		echo ""
+	fi
 	return $_ret
 }
 
@@ -213,6 +231,15 @@ clus_service_ren()
         $ccs_tool "update" "$_tmp_conf-2"
         _ret=$?
         $rm -f "$_tmp_conf-2" "$_tmp_conf" > /dev/null 2>&1
+
+	if [[ $_ret -eq '0' ]]; then
+		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
+		while ! { $clustat | $grep "service:$2 " > /dev/null; }; do
+			sleep 2
+			echo -n "."
+		done
+		echo ""
+	fi
         return $_ret
 }
 
@@ -266,7 +293,7 @@ do_rmvm()
 
 	$rm -v "$srvdir/$1"
 
-	$cat $clusconf | $grep $1 >/dev/null 2>&1
+	$cat $clusconf | $grep "\"$1\"" >/dev/null 2>&1
 	if [[ $? -eq 1 ]]; then
 		return 0
 	fi
@@ -308,7 +335,7 @@ do_usage()
 {
 	${cat} <<-end-of-help
 	${scriptname} ${scriptversion}
-	Licensed under BSDL
+	Licensed: GPL v3
 	Copyright 2010
 
 	${scriptname} is a management and control script for KVM-based virtual machines.
@@ -352,7 +379,14 @@ do_create()
 		return $?
 	fi
 
-	$cat $clusconf | $grep $1 >/dev/null 2>&1
+	if [[ ! -f "$srvdir/$2" ]]; then
+		echo "Generating service file ..."
+		$sed -e "s/MY_NAME/$2/g" \
+				"$srvdir/vm-service-ORIG" > "$srvdir/$2" 
+		chmod +x "$srvdir/$2"
+	fi
+
+	$cat $clusconf | $grep "\"$1\"" >/dev/null 2>&1
 	if [[ $? -eq 0 ]]; then
 		return 0
 	fi

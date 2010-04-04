@@ -29,7 +29,7 @@ case "$2" in
 		for (( i = 0 ; i < 12 ; ++i )); do
 			${pvmctl} shutdown "${1}"
 			${pvmctl} status ${1} > /dev/null
-			if [[ $? -eq 0 ]]; then
+			if [[ $? -eq 1 ]]; then
 				break;
 			fi
 			sleep 5

@@ -7,23 +7,10 @@
 # 1388-12-18 by hamid jafarian
 #	* use "/dev/null" if $log_file doen't exist
 
-sed="/bin/sed"
+. /etc/pvm.conf
 
-# Base Directory of PDNSoft Co. Environment
-basedir=`$sed -e "/^#/d" /etc/PDNSoftCo.bdir`
-logdir="$basedir/var/log"
-pvm_vm_service="$basedir/Scripts/pvm-vm-service"
+log_file=$( gen_log_file_fpath "$cf_vm_services_log_file" )
 
-log_file="/dev/null"
-if [[ -f "$basedir/etc/vm-services-log-file" ]]; then
-	log_file="`$sed -e "/^#/d" $basedir/etc/vm-services-log-file`"
-
-	if [[ $(expr ${log_file} : '/') -eq 0 ]]; then
-		log_file="$logdir/$log_file"
-	fi
-fi
-	
-echo "- at `date`: from `uname -n`"  >>"$log_file"
-echo "- ${2} action on ${1}"  >>"$log_file"
+echo "* `date` host: `uname -n` | action: $2 | vm: $1"  >>"$log_file"
 $pvm_vm_service ${1} ${2} >>"$log_file" 2>&1
 

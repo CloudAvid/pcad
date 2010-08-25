@@ -8,20 +8,11 @@
 # 1388-12-18 by hamid jafarian
 #	* in start, added status check(run or not) of machine
 
-sed="/bin/sed"
-
-# Base Directory of PDNSoft Co. Environment
-basedir=`$sed -e "/^#/d" /etc/PDNSoftCo.bdir`
-pvmctl="$basedir/Scripts/pvmctl"
+. /etc/pvm.conf
 
 # Main script
 case "$2" in
 	start)
-		run=`${pvmctl} status ${1}| $sed -n -e "/not running/p"`
-		if [[ -z $run ]]; then
-			exit 0
-		fi
-
 		${pvmctl} "${2}" "${1}"
 		;;
 	stop)

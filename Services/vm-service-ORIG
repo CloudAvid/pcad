@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Hourse of VM Service file...
+# USAGE: pvm-vm-service-hourse host {start,restart,stop,status}
+
+. /etc/pvm.conf 
+
+$pvm_vm_service_hourse MY_NAME ${1}
+

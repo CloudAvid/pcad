@@ -9,28 +9,11 @@
 # 1388-12-12: by hamid jafarian
 #	* start
 
+. /etc/pvm.conf
+
 # Progarm Informations 
 scriptname="pcad"
 scriptversion="0.1"
-
-sed="/bin/sed"
-cut="/bin/cut"
-cp="/bin/cp"
-cat="/bin/cat"
-rm="/bin/rm"
-grep="/bin/grep"
-qemuimg="/usr/bin/qemu-img"
-tail="/usr/bin/tail"
-awk="/bin/awk"
-
-# Cluster Status Command
-clustat="/usr/sbin/clustat"
-# Cluster Service Management Command
-clusvcadm="/usr/sbin/clusvcadm"
-# Cluster Configuration file
-clusconf="/etc/cluster/cluster.conf"
-
-ccs_tool="/sbin/ccs_tool"
 
 # Cluster Configuration Version .. 
 # Will be retrived from Cluster Configuration File
@@ -38,18 +21,6 @@ clusconf_ver=""
 # Configuration Versions been used for update
 # == ++ clusconf_ver
 new_clusconf_ver=""
-
-# Base Directory of PDNSoft Co. Environment
-basedir=`$sed -e "/^#/d" /etc/PDNSoftCo.bdir`
-logdir="$basedir/var/log"
-
-pvmctl="$basedir/Scripts/pvmctl"
-
-# Directory of Virtualization Base Images for VM Creation
-bidir="$basedir/VMStorage/BIs"
-
-# Directory of VirtualMachines Cluster Service files
-srvdir="$basedir/Scripts/Services"
 
 check_run()
 {
@@ -66,7 +37,7 @@ check_run()
 do_start()
 {
 	if [[ -z $1 ]]; then
-		echo "usage: start host_name"
+		echo "usage: start host_name [server]"
 		return 1
 	fi
 
@@ -105,7 +76,7 @@ do_stop()
 do_restart()
 {
 	if [[ -z $1 ]]; then
-		echo "usage: restart host_name"
+		echo "usage: restart host_name [server]"
 		return 1
 	fi
 
@@ -115,7 +86,11 @@ do_restart()
 		return 1
 	fi
 
-	$clusvcadm -R "$1"
+	if [[ -z "$2" ]]; then
+		$clusvcadm -R "$1"
+	else
+		$clusvcadm -r "$1" -m "$2"
+	fi
 	return $?
 	
 }
@@ -331,24 +306,6 @@ do_rename()
 	return $?
 }
 
-do_usage()
-{
-	${cat} <<-end-of-help
-	${scriptname} ${scriptversion}
-	Licensed: GPL v3
-	Copyright 2010
-
-	${scriptname} is a management and control script for KVM-based virtual machines.
-
-	Usage:  ${scriptname} start    host    - start the named VM
-	        ${scriptname} startvnc host    - start the named VM, and then connect to console via VNC
-
-	        ${scriptname} shutdown host    - send shutdown signal to VM
-
-
-	end-of-help
-}
-
 do_clone()
 {
 	if [[ -z $1 || -z $2 || -z $3 ]]; then
@@ -395,6 +352,26 @@ do_create()
 	return $?
 }
 
+do_mkbase()
+{
+	if [[ -z "$1" ]]; then
+		# print out usage string
+		$pvmctl "mkbase"
+		exit 1
+	fi
+
+	check_run "$1"
+	if [[ $? -eq "1" ]]; then
+		echo "Error: $1 is running ..."
+		echo "       Shutdown him before any work ..."
+
+		return 1
+	fi
+
+	$pvmctl "mkbase" "$1" "$2"
+	return $?
+}
+
 do_show_log()
 {
 	if [[ -f "$basedir/etc/vm-services-log-file" ]]; then
@@ -420,6 +397,51 @@ do_info()
 	echo -e $vms_ids | grep new-lin
 }
 
+do_help()
+{
+	${cat} <<-end-of-help
+	${scriptname} ${scriptversion}
+	PDNSoft Co. Cluster Administrator Utility
+	Licensed GPL v3
+	Copyright 2010
+
+	${scriptname} is a management and control script for KVM-based virtual machines in the cluster.
+
+	Usage:  ${scriptname} start    host [server]   - start the named VM on local machine or on the named server if given
+	        ${scriptname} stop     host            - stop  the named VM
+	        ${scriptname} restart  host [server]   - restart named "VM", it will be restarted on the named server if given
+
+	        ${scriptname} edit     host            - open config file for host, or create a new VM.
+
+	        ${scriptname} status                   - show the status of the cluster
+	        ${scriptname} status   host            - show full details for the named VM in the cluster
+
+	        ${scriptname} show-log                 - show the cluster activity log (use CTRL+^C to exit)
+
+	        ${scriptname} mkimg    host image_name image_size  - create a disk image in the host directory
+	        ${scriptname} mkbimg   host base_image image_name  - create a disk image base on "base_image" in the host directory
+
+	        ${scriptname} info     host                        - print out host information (parameters in config file)
+	        ${scriptname} rmvm     host                        - delete files(config/images) of virtual machine
+	        ${scriptname} rename   host   new_name             - rename host to new_name
+	        ${scriptname} clone    host   clone_name clone_id  - creating a clone from the host
+	
+	        ${scriptname} create   template host_name host_id  - Create A virtual machine from template
+
+	        ${scriptname} mkbase   host  [base-name]           - Create A virtual Template(base image) from host
+	        ${scriptname} rmbase   base_name                   - Remove the Virtual Templae (base image) 
+	        ${scriptname} mkiso    iso_name                    - Create An ISO image from the CD in Local CDROM(local)
+	        ${scriptname} rmiso    iso_name                    - Remove the ISO image
+
+	        ${scriptname} ls                                   - print out list of virtual machines
+	        ${scriptname} lst                                  - print out list of Virtual Templates 
+	        ${scriptname} lscd                                 - print out list of CD Images (ISO files)
+
+	        ${scriptname} help                                 - show this usage
+
+	end-of-help
+}
+
 # Main script
 case "${1}" in
 	"start")
@@ -431,7 +453,7 @@ case "${1}" in
 		exit $?
 		;;
 	"restart")
-		do_restart "$2"
+		do_restart "$2" "$3"
 		exit $?
 		;;
 	"status")
@@ -442,7 +464,10 @@ case "${1}" in
 		fi
 		;;
 	"mkimg")
-		$pvmctl "mkimg" $2 $3 $4
+		$pvmctl "mkimg" "$2" "$3" "$4"
+		;;
+	"mkbimg")
+		$pvmctl "mkbimg" "$2" "$3" "$4"
 		;;
 	"ls")
 		$pvmctl "ls" "$2"
@@ -450,6 +475,9 @@ case "${1}" in
 		;;
 	"lst")
 		$pvmctl "lst"
+		;;
+	"lscd")
+		$pvmctl "lscd"
 		;;
 	"rmvm")
 		do_rmvm "$2"
@@ -477,12 +505,26 @@ case "${1}" in
 		do_clone "$2" "$3" "$4"
 		exit $?
 		;;
+	"mkbase")
+		do_mkbase "$2" "$3"
+		;;
+	"rmbase")
+		$pvmctl "rmbase" "$2"
+		;;
+	"mkiso")
+		$pvmctl "mkiso" "$2"
+		;;
+	"rmiso")
+		$pvmctl "rmiso" "$2"
+		;;
 	"show-log")
 		do_show_log
 		;;
 	"help")
+		do_help
 		;;
 	*)
+		echo "Error: bad command, use \"pcad help\" for more detail."
 		;;
 esac
 

@@ -124,7 +124,7 @@ clus_service_add()
 	$cp "$clusconf" "$_tmp_conf"
 
 	echo "Generate New Cluster Configuration File ..."
-	 _resource=" \t\t\t<script file=\"/PDNSoftCo./Scripts/Services/$1\" name=\"$1\"\/>"
+	 _resource=" \t\t\t<script file=\"$basedir/Scripts/Services/$1\" name=\"$1\"\/>"
 
 	_service=" \t\t<service autostart=\"0\" domain=\"VMS-Area\" exclusive=\"0\" name=\"$1\" recovery=\"relocate\">\n"
 	_service=$_service" \t\t\t<script ref=\"$1\"/>\n"

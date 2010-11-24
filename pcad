@@ -141,7 +141,7 @@ clus_service_add()
 
 	if [[ $_ret -eq '0' ]]; then
 		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
-		while ! { $clustat | $grep "service:$1 " > /dev/null; }; do
+		for ((__i = 0; __i < 11; ++__i)); do
 			sleep 2
 			echo -n "."
 		done
@@ -175,7 +175,7 @@ clus_service_del()
 
 	if [[ $_ret -eq '0' ]]; then
 		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
-		while { $clustat | $grep "service:$1 " > /dev/null; }; do
+		for ((__i = 0; __i < 11; ++__i)); do
 			sleep 2
 			echo -n "."
 		done
@@ -209,7 +209,7 @@ clus_service_ren()
 
 	if [[ $_ret -eq '0' ]]; then
 		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
-		while ! { $clustat | $grep "service:$2 " > /dev/null; }; do
+		for ((__i = 0; __i < 11; ++__i)); do
 			sleep 2
 			echo -n "."
 		done

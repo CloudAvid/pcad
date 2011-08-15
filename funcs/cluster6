@@ -1,0 +1,131 @@
+#!/bin/bash
+
+do_get_clusconf_ver()
+{
+	if [[ ! -f $clusconf ]]; then
+		echo_error "Cluster Configuration file does't exist ..."
+		return 1
+	fi
+
+	clusconf_ver=$( $sed -n -e "/config_version/p" $clusconf  | \
+			$cut -d " " -f 2 | $cut -d "=" -f 2 )
+	
+	clusconf_ver=${clusconf_ver#\"}
+	clusconf_ver=${clusconf_ver%\"}	 
+
+	new_clusconf_ver=$(( $clusconf_ver + 1 ))
+}
+
+# Add Cluster Service
+# usage: clus_service_add new_service
+clus_service_add()
+{
+	if [[ ! -f "$srvdir/$1" ]]; then
+		echo "Generating service file ..."
+		$sed -e "s/MY_NAME/$1/g" \
+				"$srvdir/vm-service-ORIG" > "$srvdir/$1" 
+		chmod +x "$srvdir/$1"
+	fi
+
+	$cat $clusconf | $grep "\"$1\"" >/dev/null 2>&1
+	if [[ $? -eq 0 ]]; then
+		return 0
+	fi
+
+	do_get_clusconf_ver
+	if [[ $? -eq 1 ]]; then
+		return 1
+	fi
+	
+	echo "Generate New Cluster Configuration File ..."
+	 _resource=" \t\t\t<script file=\"$basedir/Scripts/Services/$1\" name=\"$1\"\/>"
+
+	_service=" \t\t<service autostart=\"0\" domain=\"VMS-Area\" exclusive=\"0\" name=\"$1\" recovery=\"relocate\">\n"
+	_service=$_service" \t\t\t<script ref=\"$1\"/>\n"
+	_service=$_service" \t\t</service>"
+	
+	$sed -i -e "/<\/resources>/i\ $_resource" \
+		-e "/<\/rm>/i\ $_service" \
+		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" "$clusconf"
+	
+	echo "Update Cluster Configuration File ..."
+	$cman_tool "version" -r -S
+	_ret=$?
+	if [[ $_ret -eq '0' ]]; then
+		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
+		for ((__i = 0; __i < 11; ++__i)); do
+			sleep 2
+			echo -n "."
+		done
+		echo ""
+	else
+		echo_error "Can't Propagate New Configuration in Cluster !"
+	fi
+	return $_ret
+}
+
+# Delete Cluster Service
+# usage: clus_service_del service_name
+clus_service_del()
+{
+	$cat $clusconf | $grep "\"$1\"" >/dev/null 2>&1
+	if [[ $? -eq 1 ]]; then
+		return 0
+	fi
+
+	do_get_clusconf_ver
+	if [[ $? -eq 1 ]]; then
+		return 1
+	fi
+
+	echo "Generate New Cluster Configuration File ..."
+	$sed -i -e "/<service.*name=\"$1\"/,/<\/service>/d" \
+		-e "/<script.*name=\"$1\"/d" \
+		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" "$clusconf"
+
+	echo "Update Cluster Configuration File ..."
+	$cman_tool "version" -r -S
+	_ret=$?
+	if [[ $_ret -eq '0' ]]; then
+		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
+		for ((__i = 0; __i < 11; ++__i)); do
+			sleep 2
+			echo -n "."
+		done
+		echo ""
+	else
+		echo_error "Can't Propagate New Configuration in Cluster !"
+	fi
+	return $_ret
+}
+
+# Rename Cluster Service
+# usage: clus_service_rename old_name new_name
+clus_service_ren()
+{
+	do_get_clusconf_ver
+	if [[ $? -eq 1 ]]; then
+		return 1
+	fi
+
+	echo "Generate New Cluster Configuration File ..."
+	sed -i -e "s/\"$1\"/\"$2\"/g" \
+		-e "s:/$1\":/$2\":g" \
+		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" "$clusconf"
+
+	echo "Update Cluster Configuration File ..."
+        $cman_tool "version" -r -S
+        _ret=$?
+	if [[ $_ret -eq '0' ]]; then
+		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
+		for ((__i = 0; __i < 11; ++__i)); do
+			sleep 2
+			echo -n "."
+		done
+		echo ""
+	else
+		echo_error "Can't Propagate New Configuration in Cluster !"
+	fi
+        return $_ret
+}
+

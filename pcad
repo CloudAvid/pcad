@@ -10,10 +10,11 @@
 #	* start
 
 . /etc/pvm.conf
+. "$basedir/Scripts/funcs/cluster"
 
 # Progarm Informations 
 scriptname="pcad"
-scriptversion="0.1"
+scriptversion="2.3.2"
 
 # Cluster Configuration Version .. 
 # Will be retrived from Cluster Configuration File
@@ -37,13 +38,13 @@ check_run()
 do_start()
 {
 	if [[ -z $1 ]]; then
-		echo "usage: start host_name [server]"
+		echo_usage "start host_name [server]"
 		return 1
 	fi
 
 	check_run "$1"
 	if [[ $? -eq 1 ]]; then
-		echo "Error: $1 is running ..."
+		echo_error "$1 is run ..."
 		return 1
 	fi
 
@@ -59,7 +60,7 @@ do_start()
 do_stop()
 {
 	if [[ -z $1 ]]; then
-		echo "usage: stop host_name"
+		echo_usage "stop host_name"
 		return 1
 	fi
 
@@ -76,7 +77,7 @@ do_stop()
 do_restart()
 {
 	if [[ -z $1 ]]; then
-		echo "usage: restart host_name [server]"
+		echo_usage "restart host_name [server]"
 		return 1
 	fi
 
@@ -93,146 +94,6 @@ do_restart()
 	fi
 	return $?
 	
-}
-
-do_get_clusconf_ver()
-{
-	if [[ ! -f $clusconf ]]; then
-		echo "Error: Cluster Configuration file does't exist ..."
-		return 1
-	fi
-
-	clusconf_ver=$( $sed -n -e "/config_version/p" $clusconf  | \
-			$cut -d " " -f 3 | $cut -d "=" -f 2 )
-	
-	clusconf_ver=${clusconf_ver#\"}
-	clusconf_ver=${clusconf_ver%\"}	 
-
-	new_clusconf_ver=$(( $clusconf_ver + 1 ))
-}
-
-# Add Cluster Service
-# usage: clus_service_add new_service
-clus_service_add()
-{
-	if [[ ! -f "$srvdir/$1" ]]; then
-		echo "Generating service file ..."
-		$sed -e "s/MY_NAME/$1/g" \
-				"$srvdir/vm-service-ORIG" > "$srvdir/$1" 
-		chmod +x "$srvdir/$1"
-	fi
-
-	$cat $clusconf | $grep "\"$1\"" >/dev/null 2>&1
-	if [[ $? -eq 0 ]]; then
-		return 0
-	fi
-
-	do_get_clusconf_ver
-	if [[ $? -eq 1 ]]; then
-		return 1
-	fi
-	
-	_tmp_conf="/tmp/__pcad_$RANDOM"
-	$cp "$clusconf" "$_tmp_conf"
-
-	echo "Generate New Cluster Configuration File ..."
-	 _resource=" \t\t\t<script file=\"$basedir/Scripts/Services/$1\" name=\"$1\"\/>"
-
-	_service=" \t\t<service autostart=\"0\" domain=\"VMS-Area\" exclusive=\"0\" name=\"$1\" recovery=\"relocate\">\n"
-	_service=$_service" \t\t\t<script ref=\"$1\"/>\n"
-	_service=$_service" \t\t</service>"
-	
-	$sed -e "/<\/resources>/i\ $_resource" "$_tmp_conf" \
-		-e "/<\/rm>/i\ $_service" \
-		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" > "$_tmp_conf-2"
-	
-	echo "Update Cluster Configuration File ..."
-	$ccs_tool "update" "$_tmp_conf-2"
-	_ret=$?
-	$rm -f "$_tmp_conf-2" "$_tmp_conf" > /dev/null 2>&1
-
-	if [[ $_ret -eq '0' ]]; then
-		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
-		for ((__i = 0; __i < 11; ++__i)); do
-			sleep 2
-			echo -n "."
-		done
-		echo ""
-	fi
-	return $_ret
-}
-
-# Delete Cluster Service
-# usage: clus_service_del service_name
-clus_service_del()
-{
-	$cat $clusconf | $grep "\"$1\"" >/dev/null 2>&1
-	if [[ $? -eq 1 ]]; then
-		return 0
-	fi
-
-	do_get_clusconf_ver
-	if [[ $? -eq 1 ]]; then
-		return 1
-	fi
-
-	_tmp_conf="/tmp/__pcad_$RANDOM"
-	$cp "$clusconf" "$_tmp_conf"
-
-	echo "Generate New Cluster Configuration File ..."
-	$sed -e "/<service.*name=\"$1\"/,/<\/service>/d" \
-		-e "/<script.*name=\"$1\"/d" \
-		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" \
-		"$_tmp_conf" > "$_tmp_conf-2"
-
-	echo "Update Cluster Configuration File ..."
-	$ccs_tool "update" "$_tmp_conf-2"
-	_ret=$?
-	$rm -f "$_tmp_conf-2" "$_tmp_conf" > /dev/null 2>&1
-
-	if [[ $_ret -eq '0' ]]; then
-		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
-		for ((__i = 0; __i < 11; ++__i)); do
-			sleep 2
-			echo -n "."
-		done
-		echo ""
-	fi
-	return $_ret
-}
-
-# Rename Cluster Service
-# usage: clus_service_rename old_name new_name
-clus_service_ren()
-{
-	do_get_clusconf_ver
-	if [[ $? -eq 1 ]]; then
-		return 1
-	fi
-
-	_tmp_conf="/tmp/__pcad_$RANDOM"
-	$cp "$clusconf" "$_tmp_conf"
-
-	echo "Generate New Cluster Configuration File ..."
-	sed -e "s/\"$1\"/\"$2\"/g" \
-		-e "s:/$1\":/$2\":g" \
-		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" \
-		"$_tmp_conf" > "$_tmp_conf-2"
-
-	echo "Update Cluster Configuration File ..."
-        $ccs_tool "update" "$_tmp_conf-2"
-        _ret=$?
-        $rm -f "$_tmp_conf-2" "$_tmp_conf" > /dev/null 2>&1
-
-	if [[ $_ret -eq '0' ]]; then
-		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
-		for ((__i = 0; __i < 11; ++__i)); do
-			sleep 2
-			echo -n "."
-		done
-		echo ""
-	fi
-        return $_ret
 }
 
 do_new()
@@ -271,14 +132,12 @@ do_edit()
 do_rmvm()
 {
 	if [[ -z $1 ]]; then
-		echo "usage: rmvm host_name"
+		echo_usage "rmvm host_name"
 		return 1
 	fi
 	check_run $1
 	if [[ $? -eq 1 ]]; then
-		echo "Error: $1 is running ..."
-		echo "       Shutting down him before any work ..."
-
+		echo_error "$1 is run... Shutting down him before any work ..."
 		return 1
 	fi
 
@@ -292,18 +151,67 @@ do_rmvm()
 	return $?
 }
 
+do_rmimg()
+{
+	if [[ -z $1 ||  -z $2 ]]; then
+		# print out usage
+		$pvmctl rmimg
+		return 1
+	fi
+	check_run $1
+	if [[ $? -eq 1 ]]; then
+		echo_error "$1 is run... Shutting down him before any work ..."
+		return 1
+	fi
+
+	$pvmctl "rmimg" "$1" "$2"
+	return "$?"
+}
+
+do_rnimg()
+{
+	if [[ -z "$1" ||  -z "$2" || -z "$3" ]]; then
+		# print out usage
+		$pvmctl rnimg
+		return 1
+	fi
+	check_run $1
+	if [[ $? -eq 1 ]]; then
+		echo_error "$1 is run... Shutting down him before any work ..."
+		return 1
+	fi
+
+	$pvmctl "rnimg" "$1" "$2" "$3"
+	return "$?"
+}
+
+do_mvvm()
+{
+	if [[ -z $1 ||  -z $2 ]]; then
+		# print out usage
+		$pvmctl mvvm
+		return 1
+	fi
+	check_run $1
+	if [[ $? -eq 1 ]]; then
+		echo_error "$1 is run... Shutting down him before any work ..."
+		return 1
+	fi
+
+	$pvmctl "mvvm" "$1" "$2"
+	return "$?"
+}
+
 do_rename()
 {
 	if [[ -z "$1" || -z "$2" ]]; then
-		echo "usage: rename host_name new_name"
+		echo_usage "rename host_name new_name"
 		return 1
 	fi
 	
 	check_run $1
 	if [[ $? -eq 1 ]]; then
-		echo "Error: $1 is running ..."
-		echo "       Shutting down him before any work ..."
-
+		echo_error "$1 is run... Shutting down him before any work ..."
 		return 1
 	fi
 
@@ -324,46 +232,45 @@ do_rename()
 do_clone()
 {
 	if [[ -z $1 || -z $2 ]]; then
-		echo "usage: clone host clone-name";
+		echo_usage "clone host clone_name [new_sid]";
 		return 1;
 	fi	
 
 	check_run "$1"
 	if [[ $? -eq 1 ]]; then
-		echo "Error: $1 is running ..."
-		echo "       Shutdown him before any work ..."
-
-		return 1
+		echo "$1 is run ..."
+		are_you_sure "Cloning from running machine,"
+		if [[ "$?" -eq 0 ]]; then
+			echo "Cloning canceled ..."
+			return 0
+		fi
 	fi
 
-	$pvmctl "clone"	"$1" "$2"
+	echo "y" | "$pvmctl" "clone"	"$1" "$2" "$3" > /dev/null
 	if [[ ! $? -eq 0 ]]; then
                 return $?
         fi
 	
-	#do_edit "$2"
 	clus_service_add "$2"
 	return $?
 }
 
 
-do_mkbase()
+do_mktmpl()
 {
 	if [[ -z "$1" ]]; then
 		# print out usage string
-		$pvmctl "mkbase"
+		$pvmctl "mktmpl"
 		exit 1
 	fi
 
 	check_run "$1"
 	if [[ $? -eq "1" ]]; then
-		echo "Error: $1 is running ..."
-		echo "       Shutdown him before any work ..."
-
+		echo_error "$1 is run... Shutdown him before any work ..."
 		return 1
 	fi
 
-	$pvmctl "mkbase" "$1" "$2"
+	$pvmctl "mktmpl" "$1" "$2" > /dev/null
 	return $?
 }
 
@@ -392,6 +299,11 @@ do_info()
 	echo -e $vms_ids | grep new-lin
 }
 
+do_ver()
+{
+	echo "$scriptversion"
+}
+
 do_help()
 {
 	${cat} <<-end-of-help
@@ -406,26 +318,28 @@ do_help()
 	        ${scriptname} stop     host            - stop  the named VM
 	        ${scriptname} restart  host [server]   - restart named "VM", it will be restarted on the named server if given
 
-
 	        ${scriptname} status                   - show the status of the cluster
 	        ${scriptname} status   host            - show full details for the named VM in the cluster
 
 	        ${scriptname} show-log                 - show the cluster activity log (use CTRL+^C to exit)
 
+	        ${scriptname} mkimg    host image_name image_size  - create a disk image in the host directory
+	        ${scriptname} rmimg    host image_name             - remove disk image of the host
+	        ${scriptname} rnimg    host image_name new_name    - rename disk image of the host
+
 	        ${scriptname} new      host_name [sid]             - Create A virtual machine
 	        ${scriptname} create   template host_name [sid]    - Create A virtual machine from template
+	        ${scriptname} clone    host clone_name [new_sid]   - creating a clone from the host
+
+	        ${scriptname} rmvm     host                        - delete virtual machine
+	        ${scriptname} rename   host new_name               - rename host to new_name
+	        ${scriptname} mvvm     host new_sid                - move virtual machine to new storage
+
 	        ${scriptname} edit     host                        - Open config file for edit
-
-	        ${scriptname} mkimg    host image_name image_size  - create a disk image in the host directory
-	        ${scriptname} mkbimg   host base_image image_name  - create a disk image base on "base_image" in the host directory
-
 	        ${scriptname} info     host                        - print out host information (parameters in config file)
-	        ${scriptname} rmvm     host                        - delete files(config/images) of virtual machine
-	        ${scriptname} rename   host   new_name             - rename host to new_name
-	        ${scriptname} clone    host   clone_name           - creating a clone from the host
 
-	        ${scriptname} mkbase   host  [base-name]           - Create A virtual Template(base image) from host
-	        ${scriptname} rmbase   base_name                   - Remove the Virtual Templae (base image) 
+	        ${scriptname} mktmpl   host  [template_name]       - Create A virtual Template from host
+	        ${scriptname} rmtmpl   template_name               - Remove the Virtual Template 
 	        ${scriptname} mkiso    iso_name                    - Create An ISO image from the CD in Local CDROM(local)
 	        ${scriptname} rmiso    iso_name                    - Remove the ISO image
 
@@ -463,8 +377,13 @@ case "${1}" in
 	"mkimg")
 		$pvmctl "mkimg" "$2" "$3" "$4"
 		;;
-	"mkbimg")
-		$pvmctl "mkbimg" "$2" "$3" "$4"
+	"rmimg")
+		do_rmimg "$2" "$3"
+		exit $?
+		;;
+	"rnimg")
+		do_rnimg "$2" "$3" "$4"
+		exit $?
 		;;
 	"ls")
 		$pvmctl "ls" "$2"
@@ -483,6 +402,10 @@ case "${1}" in
 		do_rmvm "$2"
 		exit $?
 		;;
+	"mvvm")
+		do_mvvm "$2" "$3"
+		exit $?
+		;;
 	"rename")
 		do_rename "$2" "$3"
 		exit $?
@@ -492,6 +415,12 @@ case "${1}" in
 		echo ""
 		echo "Config Parameters:"
 		$pvmctl "info" "$2"
+		;;
+	"binfo")
+		check_run "$2"
+		echo ""
+		echo "Config Parameters:"
+		$pvmctl "binfo" "$2"
 		;;
 	"edit")
 		do_edit "$2"
@@ -506,14 +435,20 @@ case "${1}" in
 		exit $?
 		;;
 	"clone")
-		do_clone "$2" "$3" 
+		do_clone "$2" "$3" "$4"
 		exit $?
 		;;
+	"mktmpl")
+		do_mktmpl "$2" "$3"
+		;;
 	"mkbase")
-		do_mkbase "$2" "$3"
+		do_mktmpl "$2" "$3"
+		;;
+	"rmtmpl")
+		$pvmctl "rmtmpl" "$2"
 		;;
 	"rmbase")
-		$pvmctl "rmbase" "$2"
+		$pvmctl "rmtmpl" "$2"
 		;;
 	"mkiso")
 		$pvmctl "mkiso" "$2"
@@ -527,8 +462,11 @@ case "${1}" in
 	"help")
 		do_help
 		;;
+	"ver")
+		do_ver
+		;;
 	*)
-		echo "Error: bad command, use \"pcad help\" for more detail."
+		echo_error "bad command, use \"pcad help\" for more detail."
 		;;
 esac
 

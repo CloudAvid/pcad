@@ -1,0 +1,94 @@
+#!/bin/bash
+# PVM Two Node Cluster Management tool
+scriptname="tnc_tool"
+scriptversion="0.0.1"
+
+cat="/bin/cat"
+cut="/bin/cut"
+sed="/bin/sed"
+grep="/bin/grep"
+service="/sbin/service"
+if [[ -f /etc/pvm.conf ]]; then
+. /etc/pvm.conf
+fi
+
+tnc_status()
+{
+	local status_line
+	local cstatus		# Connection Status
+	local nrole		# Nodes Roles
+	local dstatus		# Data Status
+	if [[ ! -f /proc/drbd ]]; then
+		echo "Failed: This node is not part of any storage zone ..."
+		exit 1
+	fi
+	status_line=($($cat /proc/drbd | $grep "0: cs"))
+	cstatus=$(echo ${status_line[1]} | $cut -d ":" -f 2)
+	nrole=($(echo ${status_line[2]} | $sed -e "s/ro://" -e "s/\// /"))
+	dstatus=($(echo ${status_line[3]} | $sed -e "s/ds://" -e "s/\// /"))
+	
+	echo "Connection Status: $cstatus"
+	echo -e "your  side: role: ${nrole[0]} \tData Status: ${dstatus[0]}"
+	echo -e "other side: role: ${nrole[1]} \tData Status: ${dstatus[1]}"
+	echo
+	$service gfs2 status | $sed -e "s/GFS2 mountpoints/FileSystems/"
+}
+	
+# this function stop sync operation on this node ...
+tnc_stopsync()
+{
+	local vml 	# List of running virtual machines on this node
+	echo "You want to stop data syncronization on this node ($($uname -n)),"
+	echo "All of the running virtual machines would be stopped ..."
+	are_you_sure
+	if [[ $? -eq 0 ]]; then exit 0; fi
+	
+	vml=$( $pvmctl "status" | $sed -e "1d" )
+	for i in $vml; do
+		$pcad stop $i
+	done
+	echo "Stopping filesystem ..."
+	$service gfs2 stop >/dev/null 2>&1
+	if [[ $? -ne 0 ]]; then
+		echo_error "Can't stop filesystem (/pvm) ..."
+		exit 1
+	fi
+	echo "Changing role to secondary ..."
+	$drbdadm secondary pvm >/dev/null 2>&1
+	if [[ $? -ne 0 ]]; then
+		echo_error "Can't change role to secondary ..."
+		exit 1
+	fi
+	echo "Stopping sync operation ..."
+	$service drbd stop >/dev/null 2>&1
+	if [[ $? -ne 0 ]]; then
+		echo_error "Can't stop sync operation ..."
+		exit 1
+	fi
+}
+
+tnc_help()
+{
+	$cat <<-end-of-help
+$scriptname $scriptversion
+$scriptname is PVM two node cluster managent tool.
+
+        usage:  status			- printout data-sync status of cluster
+                stopsync		- stop data-sync operation, preparing node to shutdown
+	end-of-help
+}
+
+case "$1" in
+	"status")
+		tnc_status
+		;;
+	"stopsync")
+		tnc_stopsync
+		;;
+	"help")
+		tnc_help
+		;;
+	*)
+		echo "Failed: bad command, use \"$scriptname help\" for more detail."
+		;;
+esac

@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # PDNSoft Co. VirtaulMachines Manager in Cluster
-# Version 0.1
 # 
 # This Manager Placed On "pvmctl" program ...
 # just add Cluster Awareness to him ...
@@ -10,11 +9,11 @@
 #	* start
 
 . /etc/pvm.conf
-. "$basedir/Scripts/funcs/cluster"
+. "$funcdir/cluster"
 
 # Progarm Informations 
 scriptname="pcad"
-scriptversion="2.3.2"
+scriptversion="2.4.0"
 
 # Cluster Configuration Version .. 
 # Will be retrived from Cluster Configuration File
@@ -61,12 +60,6 @@ do_stop()
 {
 	if [[ -z $1 ]]; then
 		echo_usage "stop host_name"
-		return 1
-	fi
-
-	check_run "$1"
-	if [[ $? -eq 0 ]]; then
-		echo "$1 is stop right now !!"
 		return 1
 	fi
 

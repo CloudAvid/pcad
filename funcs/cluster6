@@ -49,7 +49,7 @@ clus_service_add()
 		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" "$clusconf"
 	
 	echo "Update Cluster Configuration File ..."
-	$cman_tool "version" -r -S
+	$cman_tool "version" -r
 	_ret=$?
 	if [[ $_ret -eq '0' ]]; then
 		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
@@ -84,7 +84,7 @@ clus_service_del()
 		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" "$clusconf"
 
 	echo "Update Cluster Configuration File ..."
-	$cman_tool "version" -r -S
+	$cman_tool "version" -r 
 	_ret=$?
 	if [[ $_ret -eq '0' ]]; then
 		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
@@ -114,7 +114,7 @@ clus_service_ren()
 		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" "$clusconf"
 
 	echo "Update Cluster Configuration File ..."
-        $cman_tool "version" -r -S
+        $cman_tool "version" -r
         _ret=$?
 	if [[ $_ret -eq '0' ]]; then
 		echo -n "Propagate New Configuration in Cluster, Please Wait: ."

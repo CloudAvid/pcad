@@ -1,0 +1,30 @@
+#!/bin/bash
+
+if [[ ! -L /etc/pvm.conf ]]; then
+	echo "first install pvmctl ..."
+	exit 1
+fi
+. /etc/pvm.conf
+
+echo "install pvm-cluster packages ..."
+cp ./* $basedir/Scripts 2>/dev/null
+cp -r ./funcs $basedir/Scripts 2>/dev/null
+cp -r ./Services $basedir/Scripts 2>/dev/null
+cp ./tnc_tool /sbin/ 2>/dev/null
+
+chmod o-rx $basedir/Scripts/funcs
+
+echo "Cronning tasks ..."
+cat /etc/crontab | grep "/pvm/Scripts/pcad status" >/dev/null 
+if [[ $? -ne 0 ]]; then
+	echo "0 * * * * root /pvm/Scripts/pcad status" >> /etc/crontab
+fi
+service crond restart >/dev/null 2>&1
+
+echo -n "Give me pkv version: "
+read v
+unlink "$basedir/Scripts/funcs/cluster" 2>/dev/null
+ln -s "$basedir/Scripts/funcs/cluster$v" "$basedir/Scripts/funcs/cluster"
+
+echo "Installation completed ..."
+

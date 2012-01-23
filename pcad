@@ -13,7 +13,7 @@
 
 # Progarm Informations 
 scriptname="pcad"
-scriptversion="2.4.1"
+scriptversion="2.5.0"
 
 # Cluster Configuration Version .. 
 # Will be retrived from Cluster Configuration File
@@ -248,7 +248,6 @@ do_clone()
 	return $?
 }
 
-
 do_mktmpl()
 {
 	if [[ -z "$1" ]]; then
@@ -269,17 +268,23 @@ do_mktmpl()
 
 do_show_log()
 {
-	if [[ -f "$basedir/etc/vm-services-log-file" ]]; then
-		log_file="`$sed -e "/^#/d" $basedir/etc/vm-services-log-file`"
-
-		if [[ $(expr ${log_file} : '/') -eq 0 ]]; then
-			log_file="$logdir/$log_file"
-		fi
+	log_file=$(read_config_file "$basedir/etc/vm-services-log-file")
+	if [[ $(expr ${log_file} : '/') -eq 0 ]]; then
+		log_file="$logdir/$log_file"
 	fi
 
 	if [[ -f "$log_file" ]]; then
-		$tail -f "$log_file"
+		if [[ ! -z "$1" ]]; then 
+			$tail -n$1 "$log_file"
+		else
+			$tail -f "$log_file"
+		fi
 	fi
+}
+
+do_show_uptime()
+{
+	uptime | $awk '{print $3" "$4}'
 }
 
 do_info()
@@ -314,7 +319,9 @@ do_help()
 	        ${scriptname} status                   - show the status of the cluster
 	        ${scriptname} status   host            - show full details for the named VM in the cluster
 
-	        ${scriptname} show-log                 - show the cluster activity log (use CTRL+^C to exit)
+	        ${scriptname} show-log #n              - show the cluster activity log (use CTRL+^C to exit)
+
+	        ${scriptname} uptime                   - show uptime server
 
 	        ${scriptname} mkimg    host image_name image_size  - create a disk image in the host directory
 	        ${scriptname} rmimg    host image_name             - remove disk image of the host
@@ -450,7 +457,10 @@ case "${1}" in
 		$pvmctl "rmiso" "$2"
 		;;
 	"show-log")
-		do_show_log
+		do_show_log "$2"
+		;;
+	"uptime")
+		do_show_uptime
 		;;
 	"help")
 		do_help

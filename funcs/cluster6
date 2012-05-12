@@ -44,6 +44,8 @@ clus_service_add()
 	_service=$_service" \t\t\t<script ref=\"$1\"/>\n"
 	_service=$_service" \t\t</service>"
 	
+	$sed -i -e "s/<resources\/>/<resources>\n\t\t<\/resources>/" "$clusconf"
+
 	$sed -i -e "/<\/resources>/i\ $_resource" \
 		-e "/<\/rm>/i\ $_service" \
 		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" "$clusconf"

@@ -21,7 +21,7 @@ do_get_clusconf_ver()
 clus_service_add()
 {
 	if [[ ! -f "$srvdir/$1" ]]; then
-		echo "Generating service file ..."
+		echo_info "Generating service file ..."
 		$sed -e "s/MY_NAME/$1/g" \
 				"$srvdir/vm-service-ORIG" > "$srvdir/$1" 
 		chmod +x "$srvdir/$1"
@@ -37,7 +37,7 @@ clus_service_add()
 		return 1
 	fi
 	
-	echo "Generate New Cluster Configuration File ..."
+	echo_info "Generate New Cluster Configuration File ..."
 	 _resource=" \t\t\t<script file=\"$basedir/Scripts/Services/$1\" name=\"$1\"\/>"
 
 	_service=" \t\t<service autostart=\"0\" domain=\"VMS-Area\" exclusive=\"0\" name=\"$1\" recovery=\"relocate\">\n"
@@ -50,11 +50,11 @@ clus_service_add()
 		-e "/<\/rm>/i\ $_service" \
 		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" "$clusconf"
 	
-	echo "Update Cluster Configuration File ..."
+	echo_info "Update Cluster Configuration File ..."
 	$cman_tool "version" -r
 	_ret=$?
 	if [[ $_ret -eq '0' ]]; then
-		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
+		echo_info "Propagate New Configuration in Cluster, Please Wait: ."
 		for ((__i = 0; __i < 11; ++__i)); do
 			sleep 2
 			echo -n "."
@@ -80,16 +80,16 @@ clus_service_del()
 		return 1
 	fi
 
-	echo "Generate New Cluster Configuration File ..."
+	echo_info "Generate New Cluster Configuration File ..."
 	$sed -i -e "/<service.*name=\"$1\"/,/<\/service>/d" \
 		-e "/<script.*name=\"$1\"/d" \
 		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" "$clusconf"
 
-	echo "Update Cluster Configuration File ..."
+	echo_info "Update Cluster Configuration File ..."
 	$cman_tool "version" -r 
 	_ret=$?
 	if [[ $_ret -eq '0' ]]; then
-		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
+		echo_info "Propagate New Configuration in Cluster, Please Wait: ."
 		for ((__i = 0; __i < 11; ++__i)); do
 			sleep 2
 			echo -n "."
@@ -110,16 +110,16 @@ clus_service_ren()
 		return 1
 	fi
 
-	echo "Generate New Cluster Configuration File ..."
+	echo_info "Generate New Cluster Configuration File ..."
 	sed -i -e "s/\"$1\"/\"$2\"/g" \
 		-e "s:/$1\":/$2\":g" \
 		-e "s/ config_version=\"$clusconf_ver\" / config_version=\"$new_clusconf_ver\" /" "$clusconf"
 
-	echo "Update Cluster Configuration File ..."
+	echo_info "Update Cluster Configuration File ..."
         $cman_tool "version" -r
         _ret=$?
 	if [[ $_ret -eq '0' ]]; then
-		echo -n "Propagate New Configuration in Cluster, Please Wait: ."
+		echo_info "Propagate New Configuration in Cluster, Please Wait: ."
 		for ((__i = 0; __i < 11; ++__i)); do
 			sleep 2
 			echo -n "."

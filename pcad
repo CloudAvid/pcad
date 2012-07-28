@@ -13,7 +13,7 @@
 
 # Progarm Informations 
 scriptname="pcad"
-scriptversion="2.5.1"
+scriptversion="2.6.0"
 
 # Cluster Configuration Version .. 
 # Will be retrived from Cluster Configuration File
@@ -24,11 +24,11 @@ new_clusconf_ver=""
 
 check_run()
 {
-	echo "Verify $1 State, Please Wait ... "
+	echo_info "Verify $1 State, Please Wait ... "
 
 	$clustat -s "$1" >/dev/null 2>&1
 	if [[ $? -eq 0 ]]; then
-		$clustat -s "$1"
+		# $clustat -s "$1"
 		return 1
 	fi
 	return 0
@@ -48,7 +48,7 @@ do_start()
 	fi
 
 	if [[ ! -z $2 ]]; then
-		echo "Starting $1 on $2:"
+		echo_info "Starting $1 on $2:"
 		$clusvcadm -e "$1" -m "$2"
 	else
 		$clusvcadm -e "$1"
@@ -76,7 +76,7 @@ do_restart()
 
         check_run "$1"
 	if [[ $? -eq 0 ]]; then
-		echo "$1 is stop right now !!"
+		echo_result "$1 is stop right now !!"
 		return 1
 	fi
 
@@ -138,7 +138,7 @@ do_rmvm()
 	if [[ ! $? -eq 0 ]]; then
 		return 1
 	fi
-	$rm -v "$srvdir/$1"
+	$rm "$srvdir/$1"
 
 	clus_service_del "$1"
 	return $?
@@ -213,9 +213,9 @@ do_rename()
 		return 1
 	fi
 
-	echo "Generating service file ..."
+	echo_info "Generating service file ..."
 	$sed -e "s/MY_NAME/$2/g" "$srvdir/vm-service-ORIG" > "$srvdir/$2" 
-	$rm -v "$srvdir/$1"
+	$rm "$srvdir/$1"
 	chmod +x "$srvdir/$2"
 
 	clus_service_ren "$1" "$2"
@@ -231,15 +231,15 @@ do_clone()
 
 	check_run "$1"
 	if [[ $? -eq 1 ]]; then
-		echo "$1 is run ..."
-		are_you_sure "Cloning from running machine,"
+		echo_info "$1 is run ..."
+		are_you_sure "Cloning from running machine:"
 		if [[ "$?" -eq 0 ]]; then
-			echo "Cloning canceled ..."
+			echo_result "Cloning canceled ..."
 			return 0
 		fi
 	fi
 
-	echo "y" | "$pvmctl" "clone"	"$1" "$2" "$3" > /dev/null
+	echo "y" | "$pvmctl" "clone"	"$1" "$2" "$3" 
 	if [[ ! $? -eq 0 ]]; then
                 return $?
         fi
@@ -299,7 +299,7 @@ do_info()
 
 do_ver()
 {
-	echo "$scriptversion"
+	echo_result "$scriptversion"
 }
 
 do_help()

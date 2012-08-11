@@ -13,7 +13,7 @@
 
 # Progarm Informations 
 scriptname="pcad"
-scriptversion="2.6.0"
+scriptversion="2.7.0"
 
 # Cluster Configuration Version .. 
 # Will be retrived from Cluster Configuration File

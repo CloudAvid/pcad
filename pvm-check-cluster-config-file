@@ -1,0 +1,12 @@
+#!/bin/bash
+# Check existance of all defined vms (base on config files in :/pvm/etc/pvm) in 
+# cluster config file.
+
+. /etc/pvm.conf
+. $funcdir/cluster
+
+for I in $(ls $confdir); do
+	vm="${I%.pvm}"
+	echo_info "Checking $vm ..."
+	clus_service_add "$vm"
+done

@@ -8,6 +8,7 @@ fi
 
 echo "install pvm-cluster packages ..."
 cp ./* $basedir/Scripts 2>/dev/null
+"rm" $basedir/Scripts/install-pcad 2>/dev/null
 cp -r ./funcs $basedir/Scripts 2>/dev/null
 cp -r ./Services $basedir/Scripts 2>/dev/null
 cp ./tnc_tool /sbin/ 2>/dev/null

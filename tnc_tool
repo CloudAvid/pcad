@@ -1,7 +1,7 @@
 #!/bin/bash
 # PVM Two Node Cluster Management tool
 scriptname="tnc_tool"
-scriptversion="0.1.0"
+scriptversion="1.0.0"
 
 cat="/bin/cat"
 cut="/bin/cut"
@@ -72,6 +72,11 @@ tnc_stop()
 	$service rgmanager stop >/dev/null 2>&1
 	$service ricci stop >/dev/null 2>&1
 	$service cman stop >/dev/null 2>&1
+
+	$pkill pcmd >/dev/null 2>&1
+	$pkill -9 pcmd >/dev/null 2>&1
+	$pkill sballd >/dev/null 2>&1
+	$pkill -9 sballd >/dev/null 2>&1
 }
 
 tnc_startsync()
@@ -83,6 +88,7 @@ tnc_startsync()
 		exit 1
 	fi
 	echo "Make Primary ..."
+	drbdadm connect pvm
 	$drbdadm primary pvm >/dev/null 2>&1
 	if [[ $? -ne 0 ]]; then
 		echo "Error: Can't change state to primary ..."
@@ -99,18 +105,28 @@ tnc_startpvm()
 		exit 1
 	fi
 	$service ricci start >/dev/null 2>&1
-	$service gfs2 start >/dev/null 2>&1 
 	$service rgmanager start >/dev/null 2>&1
+	$service gfs2 start >/dev/null 2>&1 
 	if [[ $? -ne "0" ]]; then
 		echo "Error: Can't start resourse manager ..."
 		exit 1
 	fi
 	/pvm/Scripts/pvmctl loadvsws 
+	if [[ -f /home/pvm/pcm/pcmd ]]; then
+		/home/pvm/pcm/pcmd
+	else 
+		if [[ -f /home/pvm/pcm/sballd ]]; then
+			/home/pvm/sball/sballd
+		fi
+	fi
+	if [[ -f /etc/pvm/pvm_tnc_pc ]]; then
+		. /etc/pvm/pvm_tnc_pc
+	fi
 }
 
 tnc_help()
 {
-	$cat <<-end-of-help
+	cat <<-end-of-help
 $scriptname $scriptversion
 $scriptname is PVM two node cluster managent tool.
 

@@ -7,6 +7,6 @@
 
 for I in $(ls $confdir); do
 	vm="${I%.pvm}"
-	echo_info "Checking $vm ..."
+	echo_info "Service-Check: Checking $vm ..."
 	clus_service_add "$vm"
 done

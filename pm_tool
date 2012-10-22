@@ -1,0 +1,151 @@
+#!/bin/bash
+# PVM Mirror Management tool
+scriptname="pm_tool"
+scriptversion="0.1.0"
+
+cat="/bin/cat"
+cut="/bin/cut"
+sed="/bin/sed"
+grep="/bin/grep"
+service="/sbin/service"
+mount="/bin/mount"
+umount="/bin/umount"
+pkill="/usr/bin/pkill"
+if [[ -f /etc/pvm.conf ]]; then
+. /etc/pvm.conf
+fi
+
+pm_status()
+{
+	local status_line
+	local cstatus		# Connection Status
+	local nrole		# Nodes Roles
+	local dstatus		# Data Status
+	if [[ ! -f /proc/drbd ]]; then
+		echo "Failed: This node is not part of any storage zone ..."
+		exit 1
+	fi
+	status_line=($($cat /proc/drbd | $grep "0: cs"))
+	cstatus=$(echo ${status_line[1]} | $cut -d ":" -f 2)
+	nrole=($(echo ${status_line[2]} | $sed -e "s/ro://" -e "s/\// /"))
+	dstatus=($(echo ${status_line[3]} | $sed -e "s/ds://" -e "s/\// /"))
+	
+	echo "Connection Status: $cstatus"
+	echo -e "your  side: role: ${nrole[0]} \tData Status: ${dstatus[0]}"
+	echo -e "other side: role: ${nrole[1]} \tData Status: ${dstatus[1]}"
+	echo
+	$servcie cman status >/dev/null 2>&1
+	$service rgmanager status >/dev/null 2>&1
+	$service ricci status >/dev/null 2>&1
+}
+	
+# this function stop sync/cluster operations on this node ...
+pm_stoppvm()
+{
+	local vml 	# List of running virtual machines on this node
+	echo "You want to stop data syncronization on this node ($($uname -n)),"
+	echo "All of the running virtual machines would be stopped ..."
+	are_you_sure
+	if [[ $? -eq 0 ]]; then exit 0; fi
+	
+	vml=$( $pvmctl "status" | $sed -e "1d" )
+	for i in $vml; do
+		echo "Stopping $i ..."
+		$pcad stop $i
+	done
+	/pvm/Scripts/pvmctl unloadvsws
+	$umount /pvm
+	echo "Changing role to secondary ..."
+	$drbdadm secondary pvm >/dev/null 2>&1
+	if [[ $? -ne 0 ]]; then
+		echo_error "Can't change role to secondary ..."
+		exit 1
+	fi
+	echo "Stopping sync operation ..."
+	$service drbd stop >/dev/null 2>&1
+	if [[ $? -ne 0 ]]; then
+		echo_error "Can't stop sync operation ..."
+		exit 1
+	fi
+
+	echo "Stopping cluster operation ..."
+	$service rgmanager stop >/dev/null 2>&1
+	$service ricci stop >/dev/null 2>&1
+	$service cman stop >/dev/null 2>&1
+
+	$pkill pcmd >/dev/null 2>&1
+	$pkill -9 pcmd >/dev/null 2>&1
+	$pkill sballd >/dev/null 2>&1
+	$pkill -9 sballd >/dev/null 2>&1
+}
+
+pm_startpvm()
+{
+	echo "Starting sync operation ..."
+	$service drbd start >/dev/null 2>&1
+	if [[ $? -ne 0 ]]; then
+		echo "Error: Can't start sync operation ..."
+		exit 1
+	fi
+	echo "Make Primary ..."
+	drbdadm connect pvm
+	$drbdadm primary pvm >/dev/null 2>&1
+	if [[ $? -ne 0 ]]; then
+		echo "Error: Can't change state to primary ..."
+		exit 1
+	fi
+	$mount /pvm
+	/pvm/Scripts/pvmctl loadvsws 
+	echo "Starting cluster ..."
+	$service cman start >/dev/null 2>&1
+	if [[ $? -ne "0" ]]; then
+		echo "Error: Can't start cluster engine ..."
+		exit 1
+	fi
+	$service ricci start >/dev/null 2>&1
+	$service rgmanager start >/dev/null 2>&1
+	if [[ $? -ne "0" ]]; then
+		echo "Error: Can't start resourse manager ..."
+		exit 1
+	fi
+	if [[ -f /home/pvm/pcm/pcmd ]]; then
+		/home/pvm/pcm/pcmd
+	else 
+		if [[ -f /home/pvm/pcm/sballd ]]; then
+			/home/pvm/sball/sballd
+		fi
+	fi
+	if [[ -f /etc/pvm/pvm_pm_pc ]]; then
+		. /etc/pvm/pvm_pm_pc
+	fi
+}
+
+pm_help()
+{
+	cat <<-end-of-help
+$scriptname $scriptversion
+$scriptname is PVM Mirror managent tool.
+
+        usage:  status			- printout data-sync status of cluster
+                stoppvm			- stop pvm operation, preparing node to shutdown
+                startpvm		- start pvm operation
+	end-of-help
+}
+
+case "$1" in
+	"status")
+		pm_status
+		;;
+	"stoppvm")
+		pm_stoppvm
+		;;
+	"startpvm")
+		pm_startpvm
+		;;
+	"help")
+		pm_help
+		;;
+	*)
+		echo "Failed: bad command, use \"$scriptname help\" for more detail."
+		;;
+esac

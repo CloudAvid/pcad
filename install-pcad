@@ -12,6 +12,7 @@ cp ./* $basedir/Scripts 2>/dev/null
 cp -r ./funcs $basedir/Scripts 2>/dev/null
 cp -r ./Services $basedir/Scripts 2>/dev/null
 cp ./tnc_tool /sbin/ 2>/dev/null
+cp ./fc_tool /sbin/ 2>/dev/null
 
 chmod o-rx $basedir/Scripts/funcs
 

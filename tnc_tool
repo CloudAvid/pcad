@@ -8,6 +8,7 @@ cut="/bin/cut"
 sed="/bin/sed"
 grep="/bin/grep"
 service="/sbin/service"
+pkill="/usr/bin/pkill"
 if [[ -f /etc/pvm.conf ]]; then
 . /etc/pvm.conf
 fi
@@ -106,11 +107,11 @@ tnc_startpvm()
 	fi
 	$service ricci start >/dev/null 2>&1
 	$service rgmanager start >/dev/null 2>&1
-	$service gfs2 start >/dev/null 2>&1 
 	if [[ $? -ne "0" ]]; then
 		echo "Error: Can't start resourse manager ..."
 		exit 1
 	fi
+	$service gfs2 start >/dev/null 2>&1 
 	/pvm/Scripts/pvmctl loadvsws 
 	if [[ -f /home/pvm/pcm/pcmd ]]; then
 		/home/pvm/pcm/pcmd

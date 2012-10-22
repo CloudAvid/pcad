@@ -1,5 +1,5 @@
 #!/bin/bash
-# PVM Two Node Cluster Management tool
+# PVM Full Cluster Management tool
 scriptname="fc_tool"
 scriptversion="0.1.0"
 
@@ -8,7 +8,7 @@ cut="/bin/cut"
 sed="/bin/sed"
 grep="/bin/grep"
 service="/sbin/service"
-pkill="/bin/pkill"
+pkill="/usr/bin/pkill"
 if [[ -f /etc/pvm.conf ]]; then
 . /etc/pvm.conf
 fi

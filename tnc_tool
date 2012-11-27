@@ -9,6 +9,7 @@ sed="/bin/sed"
 grep="/bin/grep"
 service="/sbin/service"
 pkill="/usr/bin/pkill"
+fence_ack_manual="/usr/sbin/fence_ack_manual"
 if [[ -f /etc/pvm.conf ]]; then
 . /etc/pvm.conf
 fi
@@ -125,6 +126,15 @@ tnc_startpvm()
 	fi
 }
 
+tnc_shoot_node()
+{	
+	if [[ -z "$1" ]]; then
+		echo "usage: shootnode pvm-node"
+		return 1
+	fi
+	echo "absolutely" | $fence_ack_manual "$1" > /dev/null 2>&1
+}
+
 tnc_help()
 {
 	cat <<-end-of-help
@@ -135,6 +145,8 @@ $scriptname is PVM two node cluster managent tool.
                 stop			- stop pvm operation, preparing node to shutdown
                 startsync		- start pvm sync-operation
                 startpvm		- start pvm operation
+                shootnode pvm-node      - shoot out specified pvm node
+                                        - NOTE: don't use this command if you don'y know what is this.
 	end-of-help
 }
 
@@ -150,6 +162,9 @@ case "$1" in
 		;;
 	"startpvm")
 		tnc_startpvm
+		;;
+	"shootnode")
+		tnc_shoot_node "$1"
 		;;
 	"help")
 		tnc_help

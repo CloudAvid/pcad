@@ -12,6 +12,8 @@ You should first install **_pvmctl_**, then run **_install-pcad_** for pcad inst
 $ ./install-pcad
 ```
 
+NOTE: **_pcad_** developed based on **_cman + rgmanager_**. So to use pcad, you should first install & configure cman.
+
 # Documentation
 
 Complete tutorial located at [pvmctl wiki](https://github.com/pdnsoft/pvmctl/wiki).

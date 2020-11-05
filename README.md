@@ -1,9 +1,9 @@
 # Introduction
-**_pcad_**, part of PVM-Prototype, is wrapper of [pvmctl](https://github.com/pdnsoft/pvmctl/) for cluster environment.
+**_pcad_**, part of PVM-Prototype, is wrapper of [pvmctl](https://github.com/cloudavid/pvmctl/) for cluster environment.
 
 **_pcad_** is part of PVM-prototype, our early try to write special hypervisor based on KVM named **_PVM_**. 
 
-Read [pvmctl wiki](https://github.com/pdnsoft/pvmctl/wiki) for more information.
+Read [pvmctl wiki](https://github.com/cloudavid/pvmctl/wiki) for more information.
 
 # Installation
 
@@ -16,7 +16,7 @@ NOTE: **_pcad_** developed based on **_cman + rgmanager_**. So to use pcad, you 
 
 # Documentation
 
-Complete tutorial located at [pvmctl wiki](https://github.com/pdnsoft/pvmctl/wiki).
+Complete tutorial located at [pvmctl wiki](https://github.com/cloudavid/pvmctl/wiki).
 
 See also **_pcad help_**:
 ```shell
@@ -69,6 +69,6 @@ If you are capable of contributing code changes, we encourage you to do so. You 
 * ... 
 
 # Bugs
- Please use github [issues](https://github.com/pdnsoft/pcad/issues) to report bugs. 
+ Please use github [issues](https://github.com/cloudavid/pcad/issues) to report bugs. 
 # About
-Copyright 2010-2015 [PDNSoft](http://www.pdnsoft.com).
+Copyright 2010-2020 [CloudAvid](http://www.cloudavid.com).
